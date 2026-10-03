@@ -39,7 +39,7 @@ KAGGLE_URL = f"https://www.kaggle.com/datasets/{KAGGLE_ID}"
 # Kaggle DOIs are per dataset version: after an upload, generate a DOI for that version on Kaggle and set it here
 # (None leaves the DOI out of README.md and CITATION.cff)
 DOI = None
-CODE_URL = "https://github.com/hamidhosen42/BSCAN-Dual-Branch-Spectro-Cepstral-Residual-Attention-Network-for-Bengali-Deepfake-Audio-Detection"
+CODE_URL = "https://github.com/hamidhosen42/bscan-bengali-deepfake-forensics"
 ARTICLE = "BSCAN: Dual-Branch Spectro-Cepstral Residual Attention Network for Bengali Deepfake Audio Detection"
 AUTHORS = ["Kahakashan Ashraf", "Md. Hamid Hosen", "Mahfuzulhoq Chowdhury"]
 BF_URL = "https://huggingface.co/datasets/sifat1221/banglaFake/resolve/main/final_data.zip"
