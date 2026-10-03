@@ -1,5 +1,7 @@
 # BSCAN: Dual-Branch Spectro-Cepstral Residual Attention Network for Bengali Deepfake Audio Detection
 
+[![Code DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23126423.svg)](https://doi.org/10.5281/zenodo.23126423) [![Dataset DOI](https://img.shields.io/badge/dataset%20DOI-10.34740%2FKAGGLE%2FDSV%2F20278870-blue)](https://doi.org/10.34740/KAGGLE/DSV/20278870)
+
 Kahakashan Ashraf<sup>1</sup>, Md. Hamid Hosen<sup>2</sup>, Mahfuzulhoq Chowdhury<sup>1</sup>
 
 <sup>1</sup> Dept. of CSE, Chittagong University of Engineering and Technology · <sup>2</sup> Dept. of CSE, East Delta University
@@ -67,4 +69,4 @@ The data-audit steps that come before the GPU runs need the corpora in `data/`. 
 - **Mendeley Bangla Audio Dataset, version 4** (Dipto, Ayan & Faria, DOI 10.17632/4ftmwt86vr.4; its audio is byte-identical to version 1) is listed under CC BY 4.0. Versions 3 and 4 add a dataset usage agreement that, among other terms, allows academic and research use only, forbids redistribution without the provider's written consent, and forbids any re-identification of speakers. Its audio is not redistributed; fetch it from Mendeley Data and follow those terms.
 - Data files produced by this project (metadata, splits, descriptors, audits and scores) are released under CC BY 4.0. The code is released under the MIT licence (`LICENSE`).
 
-Please cite the article and both source datasets. The companion dataset of this repository is: Ashraf K, Hosen MH, Chowdhury M. Bengali Deepfake Forensics Dataset (BSCAN), version 7. Kaggle; 2026. doi:[10.34740/KAGGLE/DSV/20278870](https://doi.org/10.34740/KAGGLE/DSV/20278870).
+Please cite the article and both source datasets. The companion dataset of this repository is: Ashraf K, Hosen MH, Chowdhury M. Bengali Deepfake Forensics Dataset (BSCAN), version 7. Kaggle; 2026. doi:[10.34740/KAGGLE/DSV/20278870](https://doi.org/10.34740/KAGGLE/DSV/20278870). The code of the article is release v1.0.0, archived at Zenodo: doi:[10.5281/zenodo.23126424](https://doi.org/10.5281/zenodo.23126424) (all versions: [10.5281/zenodo.23126423](https://doi.org/10.5281/zenodo.23126423)).
