@@ -1,0 +1,13 @@
+model,protocol,split,auc_mean,auc_sd,eer_mean,eer_sd,n_seeds,status
+bscan_orig6s,P1,internal_test,0.9526475511136844,,0.1207471647765176,,1,placeholder
+bscan_orig6s,P1,external_BF-MOZ,0.6487010637195044,,0.3954236682159456,,1,placeholder
+bscan_orig6s,P1,external_MEN,0.7016112592592592,,0.356,,1,placeholder
+bscan_controlled,P1,internal_test,0.7624398030975509,0.110942128496653,0.3042028018679119,0.0907050752092135,3,placeholder
+bscan_controlled,P1,external_BF-MOZ,0.864218975444305,0.1353777622628526,0.2024788463830294,0.1239384802720396,3,placeholder
+bscan_controlled,P1,external_MEN,0.8460279176954734,0.1262461191323837,0.2226666666666666,0.1123908524022471,3,placeholder
+stats_hgb_orig6s,P1,internal_test,0.999605696659681,,0.010006671114076,,1,real
+stats_hgb_orig6s,P1,external_BF-MOZ,0.998679442157304,,0.0121558813013943,,1,real
+stats_hgb_orig6s,P1,external_MEN,0.9475361975308642,,0.1031111111111111,,1,real
+stats_hgb_controlled,P1,internal_test,0.9281802722829228,,0.152768512341561,,1,real
+stats_hgb_controlled,P1,external_BF-MOZ,0.953573782830038,,0.1001072577761887,,1,real
+stats_hgb_controlled,P1,external_MEN,0.4435342222222222,,0.5457777777777778,,1,real

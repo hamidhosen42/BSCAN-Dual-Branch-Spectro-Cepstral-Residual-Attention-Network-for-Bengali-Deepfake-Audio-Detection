@@ -1,0 +1,29 @@
+{
+  "release": "release/BSCAN_Bengali_Audio_Deepfake_Benchmark",
+  "kaggle": "https://www.kaggle.com/datasets/hosen42/bengali-deepfake-forensics-dataset",
+  "doi": null,
+  "files_listed": 31092,
+  "audio_files_in_release": 0,
+  "release_bytes": 69937925,
+  "hours_total": 48.671,
+  "by_dataset_label": {
+    "BF-MOZ|0": 2797,
+    "BF-MOZ|1": 2797,
+    "BF-NEWS|0": 1000,
+    "BF-SUST|0": 9999,
+    "BF-SUST|1": 9999,
+    "MEN|0": 2250,
+    "MEN|1": 2250
+  },
+  "exact_zero_ratio": true,
+  "score_runs": [
+    "lfcc_gmm_controlled__P1__seed42",
+    "lfcc_gmm_controlled__P2__seed42",
+    "stats_hgb_controlled__P1__seed42",
+    "stats_hgb_controlled__P2__seed42",
+    "stats_hgb_orig6s__P1__seed42",
+    "stats_hgb_orig6s__P2__seed42"
+  ],
+  "private_strings": [],
+  "junk_files": []
+}
