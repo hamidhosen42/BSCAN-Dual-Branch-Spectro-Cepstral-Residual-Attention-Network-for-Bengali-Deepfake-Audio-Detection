@@ -1,6 +1,10 @@
 """Generate every figure from result files (no numbers typed by hand).
 
-Figures are written as vector PDFs to PLOS/figures/ (the figure files of PLOS/BSCAN_PLOS_ONE.tex).
+Figures are written as vector PDFs to PLOS/figures/ (the figure files of PLOS/BSCAN_PLOS_ONE.tex), named after
+the number the figure receives in the manuscript (Fig1 ... Fig9, S1_Fig; .scripts/final_qc.py checks that the
+order of the figure floats matches).  Every figure whose inputs are all real is also exported as a PLOS
+submission file, PLOS/submission/<name>.tif (RGB, 300 dpi, LZW); placeholder figures are never exported, and the
+TIFFs of the previous run are deleted first.
 If any input of a figure is a synthetic placeholder, the figure is overprinted with a red
 "SYNTHETIC PLACEHOLDER - NOT A RESULT" banner, the same text is written into the PDF metadata (Keywords)
 so that .scripts/final_qc.py can detect it in the file itself, and the figure is listed as such in
@@ -33,10 +37,12 @@ sys.path.insert(0, str(ROOT / "src"))
 from bscan.registry import load_registry, resolve  # noqa: E402
 
 FIG = ROOT / "PLOS" / "figures"
+SUBMISSION = ROOT / "PLOS" / "submission"  # upload-ready TIFFs of the real figures
 OUT = ROOT / "results" / "figures"
 MANIFEST: list[dict] = []
 PLACEHOLDER_MARK = "SYNTHETIC PLACEHOLDER - NOT A RESULT"
-plt.rcParams.update({"font.family": "DejaVu Sans", "font.size": 8, "axes.titlesize": 9, "axes.labelsize": 8,
+# PLOS figure guidelines: Arial (DejaVu Sans only as a per-glyph fallback), embedded as TrueType, not Type 3
+plt.rcParams.update({"font.family": ["Arial", "DejaVu Sans"], "pdf.fonttype": 42, "font.size": 8, "axes.titlesize": 9, "axes.labelsize": 8,
                      "legend.fontsize": 7, "xtick.labelsize": 7, "ytick.labelsize": 7, "axes.spines.top": False,
                      "axes.spines.right": False, "figure.dpi": 150})
 # colour-blind-safe palette (Okabe-Ito)
@@ -76,6 +82,14 @@ def save(fig, name: str, caption: str, status: str, sources: list[str]) -> None:
                  ha="center", va="center", rotation=25, weight="bold", transform=fig.transFigure, zorder=1000)
         meta["Keywords"] = PLACEHOLDER_MARK
     fig.savefig(FIG / f"{name}.pdf", bbox_inches="tight", metadata=meta)  # vector figure of the manuscript
+    if status == "real":  # PLOS upload file: TIFF, RGB (no alpha), 300 dpi, LZW compression
+        SUBMISSION.mkdir(parents=True, exist_ok=True)
+        fig.savefig(SUBMISSION / f"{name}.tif", dpi=300, bbox_inches="tight", facecolor="white",
+                    pil_kwargs={"compression": "tiff_lzw"})
+        from PIL import Image
+        with Image.open(SUBMISSION / f"{name}.tif") as im:
+            rgb = im.convert("RGB")
+        rgb.save(SUBMISSION / f"{name}.tif", compression="tiff_lzw", dpi=(300, 300))
     plt.close(fig)
     MANIFEST.append({"figure": name, "status": status, "caption": caption, "sources": ";".join(rel(x) for x in sources)})
 
@@ -102,31 +116,40 @@ def box(ax, x, y, w, h, text, fc="#EAF2FB", ec="#0072B2", fs=7):
 
 
 def arrow(ax, x0, y0, x1, y1):
-    ax.add_patch(FancyArrowPatch((x0, y0), (x1, y1), arrowstyle="-|>", mutation_scale=8, lw=0.8, color="#333333"))
+    ax.add_patch(FancyArrowPatch((x0, y0), (x1, y1), arrowstyle="-|>", mutation_scale=9, lw=0.9, color="#333333",
+                                 shrinkA=0, shrinkB=0, zorder=5))
 
 
 def fig_architecture():
-    fig, ax = plt.subplots(figsize=(7.5, 3.8))
-    ax.set_xlim(-0.02, 1.02)
-    ax.set_ylim(0, 1)
+    """Block diagram; no title inside the image (PLOS), every label inside its box, arrows between box edges."""
+    fig = plt.figure(figsize=(7.2, 3.3))  # with the 0.1 in save padding the file stays within 7.5 in
+    ax = fig.add_axes((0, 0, 1, 1))
+    ax.set_xlim(-0.015, 1.015)
+    ax.set_ylim(-0.02, 1.02)
     ax.axis("off")
-    fs = 6.6
-    box(ax, 0.000, 0.40, 0.120, 0.22, "Recording\n(any rate)\n→ 16 kHz\nmono", fc="#F4F4F4", ec="#555555", fs=fs)
-    box(ax, 0.145, 0.30, 0.150, 0.42, "Controlled\npreprocessing\n• trim silence\n• repeat-pad\n• 6 s windows,\n  10 % overlap\n• DC removal\n• −60 dBFS dither",
-        fc="#F4F4F4", ec="#555555", fs=fs)
-    arrow(ax, 0.120, 0.51, 0.145, 0.51)
-    for yb, name in ((0.66, "Mel spectrogram\n128 bands, dB re max\n+ Δ, ΔΔ\n3 × 128 × 188"),
-                     (0.12, "LFCC\n40 linear filters, DCT\n+ Δ, ΔΔ\n3 × 40 × 188")):
-        box(ax, 0.325, yb, 0.175, 0.22, name, fs=fs)
-        arrow(ax, 0.295, 0.51, 0.325, yb + 0.11)
-        box(ax, 0.530, yb, 0.170, 0.22, "SE-ResBlock 3→32\nmax-pool 2×2\nSE-ResBlock 32→64\nfrequency avg-pool", fs=fs)
-        arrow(ax, 0.500, yb + 0.11, 0.530, yb + 0.11)
-        box(ax, 0.725, yb + 0.03, 0.105, 0.16, "temporal\nattention\npooling → 64", fs=fs)
-        arrow(ax, 0.700, yb + 0.11, 0.725, yb + 0.11)
-        arrow(ax, 0.830, yb + 0.11, 0.855, 0.51)
-    box(ax, 0.855, 0.33, 0.145, 0.36, "concat (128)\nFC 128, ReLU\ndropout 0.3\nFC 1 → logit\n\nrecording score\n= mean window\nlogit", fc="#FDF1E6", ec="#D55E00", fs=fs)
-    ax.text(0.5, 0.985, "BSCAN: two parallel residual branches with squeeze-and-excitation and temporal attention, late fusion",
-            ha="center", va="top", fontsize=7.5)
+    fs, pad = 8, 0.01  # font size (pt); FancyBboxPatch pad, so the visible edge is pad outside (x, y, w, h)
+    grey = {"fc": "#F4F4F4", "ec": "#555555"}
+
+    def link(x0, y0, x1, y1):  # from the right edge of one box to the left edge of the next
+        arrow(ax, x0 + pad, y0, x1 - pad, y1)
+
+    box(ax, 0.000, 0.37, 0.095, 0.26, "Recording\n(any rate)\n\u2192 16 kHz,\nmono", fs=fs, **grey)
+    box(ax, 0.135, 0.20, 0.145, 0.60, "Controlled\npreprocessing\n\u2022 trim silence\n\u2022 repeat-pad\n"
+        "\u2022 6 s windows,\n   10% overlap\n\u2022 DC removal\n\u2022 \u221260 dBFS\n   dither", fs=fs, **grey)
+    link(0.095, 0.50, 0.135, 0.50)
+    for yc, feat in ((0.76, "Mel spectrogram\n128 bands, dB\n+ \u0394, \u0394\u0394\n3 \u00d7 128 \u00d7 188"),
+                     (0.24, "LFCC\n40 linear filters,\nDCT\n+ \u0394, \u0394\u0394\n3 \u00d7 40 \u00d7 188")):
+        y0, h = yc - 0.18, 0.36
+        link(0.280, 0.50 + (0.12 if yc > 0.5 else -0.12), 0.320, yc)
+        box(ax, 0.320, y0, 0.150, h, feat, fs=fs)
+        link(0.470, yc, 0.510, yc)
+        box(ax, 0.510, y0, 0.150, h, "SE-ResBlock\n3\u219232\nmax-pool 2\u00d72\nSE-ResBlock\n32\u219264\nfreq. average\npool",
+            fs=fs)
+        link(0.660, yc, 0.700, yc)
+        box(ax, 0.700, yc - 0.13, 0.100, 0.26, "temporal\nattention\npooling\n\u2192 64", fs=fs)
+        link(0.800, yc, 0.840, 0.50 + (0.12 if yc > 0.5 else -0.12))
+    box(ax, 0.840, 0.24, 0.160, 0.52, "concat (128)\nFC 128, ReLU\ndropout 0.3\nFC 1 \u2192 logit\n\nrecording score\n"
+        "= mean window\nlogit", fc="#FDF1E6", ec="#D55E00", fs=fs)
     save(fig, "Fig1", "Architecture and preprocessing", "real", ["src/bscan/models/bscan.py", "src/bscan/audio.py"])
 
 
@@ -138,7 +161,7 @@ def fig_corpus_cues():
     w = w[w.scheme == "trim_repeat"].groupby("audio_path").dc.mean().rename("dc_win").reset_index()
     d = d.merge(w, on="audio_path", how="left")
     groups = [("BF-SUST", 0), ("BF-SUST", 1), ("BF-MOZ", 0), ("BF-MOZ", 1), ("BF-NEWS", 0), ("MEN", 0), ("MEN", 1)]
-    names = [f"{g}\n{'spoof' if l else 'bona fide'}" for g, l in groups]
+    names = [f"{g}\n{'synthetic' if l else 'bona fide'}" for g, l in groups]
     fig, axes = plt.subplots(1, 3, figsize=(7.5, 2.6))
     for ax, col, lab in ((axes[0], "duration_sec", "Duration (s)"), (axes[1], "trailing_silence_sec", "Trailing silence (s)"),
                          (axes[2], "dc_win", "DC offset after peak normalisation")):
@@ -153,7 +176,7 @@ def fig_corpus_cues():
     axes[0].set_ylim(0, 16)
     fig.tight_layout()
     label_panels(axes)
-    save(fig, "Fig3", "Recording-level cues by corpus and class", "real",
+    save(fig, "Fig2", "Recording-level cues by corpus and class", "real",
          ["metadata/recording_descriptors.csv", "results/phase3/window_descriptors.csv.gz"])
 
 
@@ -174,12 +197,12 @@ def fig_shortcuts():
         ax.set_xticklabels([SPLITNAME[(proto, s)] for s in splits], fontsize=6.5)
         ax.set_title(f"{proto}: trained on {'BF-SUST' if proto == 'P1' else 'MEN'}")
         ax.set_ylim(0, 1.05)
-    axes[0].set_ylabel("AUC without speech content")
+    axes[0].set_ylabel("AUC of coarse window statistics")
     h, l = axes[0].get_legend_handles_labels()
     fig.legend(h, l, loc="upper center", ncol=3, frameon=False, bbox_to_anchor=(0.5, 1.02))
     fig.tight_layout(rect=(0, 0, 1, 0.92))
     label_panels(axes)
-    save(fig, "Fig4", "Label information available from content-agnostic descriptors", "real",
+    save(fig, "Fig3", "Label information available from coarse window statistics", "real",
          ["results/phase3/model_visible_shortcut_diagnostics.csv"])
 
 
@@ -207,13 +230,13 @@ def fig_roc():
     axes[0].legend(frameon=False, loc="lower right", fontsize=6)
     fig.tight_layout()
     label_panels(axes)
-    save(fig, "Fig5", "ROC curves under P1", combine(sts), srcs)
+    save(fig, "Fig4", "ROC curves under P1", combine(sts), srcs)
 
 
 def fig_cross():
     s = pd.read_csv(ROOT / "results/stats/cross_corpus_auc.csv")
     if s.empty:
-        return skip("Fig6", "Cross-corpus AUC matrix", "results/stats/cross_corpus_auc.csv is empty")
+        return skip("Fig7", "Cross-corpus AUC matrix", "results/stats/cross_corpus_auc.csv is empty")
     rows = [f"{LABEL[r.model]} ← {r.train_corpus}" for r in s.itertuples()]
     mat = s[["test_BF-SUST", "test_BF-MOZ", "test_MEN"]].to_numpy(dtype=float)
     fig, ax = plt.subplots(figsize=(5.2, 0.32 * len(rows) + 1.0))
@@ -229,7 +252,7 @@ def fig_cross():
     ax.set_yticklabels(rows, fontsize=6.5)
     fig.colorbar(im, ax=ax, fraction=0.04, label="AUC")
     fig.tight_layout()
-    save(fig, "Fig6", "Cross-corpus AUC matrix", combine(list(s.status)), ["results/stats/cross_corpus_auc.csv"])
+    save(fig, "Fig7", "Cross-corpus AUC matrix", combine(list(s.status)), ["results/stats/cross_corpus_auc.csv"])
 
 
 def fig_repr_ablation():
@@ -258,7 +281,7 @@ def fig_repr_ablation():
     axes[0].set_ylabel("AUC (mean ± SD over seeds)")
     fig.tight_layout()
     label_panels(axes)
-    save(fig, "Fig7", "Representation study and trained ablation", combine(sts), ["results/stats/multiseed_summary.csv"])
+    save(fig, "Fig9", "Representation study and ablation", combine(sts), ["results/stats/multiseed_summary.csv"])
 
 
 def _analysis_frame(kind: str) -> tuple[pd.DataFrame, list[str]]:
@@ -319,16 +342,16 @@ def fig_robustness_probes():
 def fig_errors_calibration():
     ge = ROOT / "results/analysis/error_groups.csv"
     if not ge.exists():
-        return skip("Fig9", "Systematic error analysis of BSCAN on MEN", "results/analysis/error_groups.csv missing")
+        return skip("Fig6", "Systematic error analysis of BSCAN on MEN", "results/analysis/error_groups.csv missing")
     g = pd.read_csv(ge)
     g = g[g.run == "bscan_controlled__P1__seed42"]
     if g.empty:
-        return skip("Fig9", "Systematic error analysis of BSCAN on MEN", "no rows for bscan_controlled__P1__seed42")
+        return skip("Fig6", "Systematic error analysis of BSCAN on MEN", "no rows for bscan_controlled__P1__seed42")
     fig, axes = plt.subplots(1, 3, figsize=(7.5, 2.5))
     for ax, grouping, title in ((axes[0], "duration_tertile", "Duration"), (axes[1], "snr_proxy_tertile", "SNR proxy"),
                                 (axes[2], "trailing_silence", "Trailing silence")):
         sub = g[(g.grouping == grouping) & (g.split == "external_MEN")]
-        ax.bar(np.arange(len(sub)) - 0.2, sub.fnr * 100, 0.4, color="#D55E00", label="FNR (spoof missed)")
+        ax.bar(np.arange(len(sub)) - 0.2, sub.fnr * 100, 0.4, color="#D55E00", label="FNR (synthetic missed)")
         ax.bar(np.arange(len(sub)) + 0.2, sub.fpr * 100, 0.4, color="#0072B2", label="FPR (bona fide flagged)")
         ax.set_xticks(range(len(sub)))
         ax.set_xticklabels(sub.level, fontsize=6.5)
@@ -338,7 +361,7 @@ def fig_errors_calibration():
     fig.legend(h, l, loc="upper center", ncol=2, frameon=False, fontsize=7, bbox_to_anchor=(0.5, 1.04))
     fig.tight_layout(rect=(0, 0, 1, 0.93))
     label_panels(axes)
-    save(fig, "Fig9", "Systematic error analysis of BSCAN on MEN", combine(list(g.status.unique())),
+    save(fig, "Fig6", "Systematic error analysis of BSCAN on MEN", combine(list(g.status.unique())),
          ["results/analysis/error_groups.csv"])
 
 
@@ -363,11 +386,11 @@ def fig_confusion():
     """Confusion matrices of BSCAN (P1, seed 42) at the validation EER threshold, one per evaluation tier."""
     st, path = resolve("bscan_controlled__P1__seed42")
     if path is None:
-        return skip("Fig_confusion", "Confusion matrices of BSCAN across the evaluation tiers",
+        return skip("Fig5", "Confusion matrices of BSCAN across the evaluation tiers",
                     "run bscan_controlled__P1__seed42 missing")
     thr = json.loads((path / "metrics.json").read_text()).get("threshold_logit")
-    splits = [("internal_test", "Tier 1: internal test (BF-SUST)"), ("external_BF-MOZ", "Tier 2: independent (Mozilla)"),
-              ("external_MEN", "Tier 3: cross-dataset (Mendeley)")]
+    splits = [("internal_test", "Tier 1: internal test (BF-SUST)"), ("external_BF-MOZ", "Tier 2: independent (BF-MOZ)"),
+              ("external_MEN", "Tier 3: cross-dataset (MEN)")]
     fig, axes = plt.subplots(1, 3, figsize=(7.5, 2.6))
     srcs = []
     for ax, (sp, title) in zip(axes, splits):
@@ -385,27 +408,30 @@ def fig_confusion():
                 ax.text(j, i, f"{cm[i, j]:,}", ha="center", va="center", fontsize=8,
                         color="white" if cm[i, j] > cm.max() / 2 else "black")
         ax.set_xticks([0, 1])
-        ax.set_xticklabels(["pred. bona fide", "pred. spoof"], fontsize=7)
+        ax.set_xticklabels(["pred. bona fide", "pred. synthetic"], fontsize=7)
         ax.set_yticks([0, 1])
-        ax.set_yticklabels(["bona fide", "spoof"], fontsize=7)
+        ax.set_yticklabels(["bona fide", "synthetic"], fontsize=7)
         ax.set_title(title, fontsize=8)
         srcs.append(str(f))
     label_panels(axes)
     fig.tight_layout()
-    save(fig, "Fig_confusion", "Confusion matrices of BSCAN across the evaluation tiers", st, srcs)
+    save(fig, "Fig5", "Confusion matrices of BSCAN across the evaluation tiers", st, srcs)
 
 
-# file name of every generated figure (PLOS/figures/<name>.pdf)
-FIGURES = ["Fig1", "Fig3", "Fig4", "Fig5", "Fig6", "Fig7", "Fig8", "Fig9", "S1_Fig", "Fig_confusion"]
+# file name of every generated figure (PLOS/figures/<name>.pdf), = its number in the manuscript; the names of an
+# earlier numbering are listed so that their stale files are removed as well
+FIGURES = ["Fig1", "Fig2", "Fig3", "Fig4", "Fig5", "Fig6", "Fig7", "Fig8", "Fig9", "S1_Fig"]
+OLD_NAMES = ["Fig_confusion"]
 
 
 def main() -> None:
     # remove the figure files of the previous run (and any listed in the previous manifest) so that only
     # figures regenerated now exist; other files in PLOS/figures/ are left alone
     old = OUT / "figure_manifest.csv"
-    names = set(FIGURES) | (set(pd.read_csv(old).figure.astype(str)) if old.exists() else set())
+    names = set(FIGURES) | set(OLD_NAMES) | (set(pd.read_csv(old).figure.astype(str)) if old.exists() else set())
     for n in names:
         (FIG / f"{n}.pdf").unlink(missing_ok=True)
+        (SUBMISSION / f"{n}.tif").unlink(missing_ok=True)
     for f in (fig_architecture, fig_corpus_cues, fig_shortcuts, fig_roc, fig_cross, fig_repr_ablation,
               fig_robustness_probes, fig_errors_calibration, fig_training_curves, fig_confusion):
         try:

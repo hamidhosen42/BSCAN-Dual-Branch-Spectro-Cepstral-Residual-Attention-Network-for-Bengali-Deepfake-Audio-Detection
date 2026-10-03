@@ -414,7 +414,7 @@ Class labels are confounded with recording properties in every corpus. Median tr
 
 {table(["corpus", "descriptor", "separability"], cue_rows, "llr")}
 A detector that never hears speech content can therefore score highly in-corpus; see `scores/stats_hgb_*`
-(gradient boosting on 11 content-agnostic window descriptors) and the controlled preprocessing described in the article.
+(gradient boosting on 11 coarse window descriptors) and the controlled preprocessing described in the article.
 
 ## Audits
 

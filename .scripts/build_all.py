@@ -8,8 +8,11 @@ Steps:
   2. placeholders for still-missing registered runs (unless --no-placeholders), clearly marked
   3. statistics (bscan.statistics), error analysis and calibration (bscan.analysis)
   4. tables + macros (PLOS/generated/), figures (PLOS/figures/), reports (results/reports/)
-  5. PLOS/BSCAN_PLOS_ONE.pdf: pdflatex, bibtex, pdflatex twice (bibliography style plos2025.bst of the PLOS
-     LaTeX template, kept next to the .tex). Skipped with a message when the manuscript or LaTeX is absent.
+  5. PLOS/BSCAN_PLOS_ONE.pdf: pdflatex, bibtex, pdflatex twice, and once more while LaTeX asks for it
+     (bibliography style plos2025.bst of the PLOS LaTeX template, kept next to the .tex); then the one-column
+     reading copy PLOS/BSCAN_onecolumn.pdf (.scripts/build_onecolumn.py: same body, other page layout, every
+     table and figure in place, wide tables on landscape pages).
+     Skipped with a message when the manuscript or LaTeX is absent.
      LaTeX tools are taken from the directory in the environment variable TEXBIN if set, otherwise from PATH.
   6. final QC (.scripts/final_qc.py) -> results/QC_REPORT.md; exit status 0 only if submission-ready
 """
@@ -117,7 +120,11 @@ def latex(stem: str, clean: tuple[str, ...] = (".aux", ".blg", ".out")) -> None:
     for cmd in (pdf, [bibtex, stem], pdf, pdf):
         subprocess.run(cmd, cwd=MANUSCRIPT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     log = MANUSCRIPT / f"{stem}.log"
-    ok = (MANUSCRIPT / f"{stem}.pdf").exists() and log.exists() and not re.search(r"^!", log.read_text(errors="replace"), re.M)
+    for _ in range(3):  # floats that move between passes can leave the cross-references one pass behind
+        if "Rerun to get" not in (log.read_text(errors="replace") if log.exists() else ""):
+            break
+        subprocess.run(pdf, cwd=MANUSCRIPT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    ok =(MANUSCRIPT / f"{stem}.pdf").exists() and log.exists() and not re.search(r"^!", log.read_text(errors="replace"), re.M)
     print(f"compiled PLOS/{stem}.pdf" if ok else f"LaTeX errors: see PLOS/{stem}.log")
     if ok:
         for ext in clean:
@@ -145,6 +152,7 @@ def main() -> None:
     sh(PY, ".scripts/generate_reports.py")
     if not args.skip_latex:
         latex(PAPER)
+        sh(PY, ".scripts/build_onecolumn.py", check=False)  # reading copy; its own LaTeX passes
     r = sh(PY, ".scripts/final_qc.py", check=False)
     sys.exit(r.returncode)
 

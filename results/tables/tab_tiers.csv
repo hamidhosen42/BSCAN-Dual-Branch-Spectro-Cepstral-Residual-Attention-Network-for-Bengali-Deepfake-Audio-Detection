@@ -1,4 +1,4 @@
 tier,split,n,status
 "\textbf{Tier 1:} Internal test (BF-SUST, held out)",internal_test,2998,placeholder
-\textbf{Tier 2:} Independent (Mozilla),external_BF-MOZ,5594,placeholder
-\textbf{Tier 3:} Cross-dataset (Mendeley),external_MEN,4500,placeholder
+\textbf{Tier 2:} Independent (BF-MOZ),external_BF-MOZ,5594,placeholder
+\textbf{Tier 3:} Cross-dataset (MEN),external_MEN,4500,placeholder

@@ -27,6 +27,9 @@ TEX = MANUSCRIPT / "BSCAN_PLOS_ONE.tex"
 BIB = MANUSCRIPT / "refs.bib"  # default; the \\bibliography{...} of the manuscript takes precedence
 GEN = MANUSCRIPT / "generated"
 FIGDIR = MANUSCRIPT / "figures"
+DAS = MANUSCRIPT / "DATA_AVAILABILITY_STATEMENT.txt"  # text for the Editorial Manager field
+# unfinished wording in the reference list (fields of refs.bib and the compiled .bbl)
+REF_PLACEHOLDER = re.compile(r"to be (added|supplied|confirmed)|\bTODO\b|\bTBD\b|\bplaceholder\b|\bXXX\b", re.I)
 MANIFEST = ROOT / "results/figures/figure_manifest.csv"
 PLACEHOLDER_MARK = b"SYNTHETIC PLACEHOLDER"  # banner and PDF metadata of placeholder figures (generate_figures.py)
 ABSTRACT_MAX_WORDS = 300  # PLOS ONE submission guidelines
@@ -83,9 +86,10 @@ def check_generated():
         if r"\missing{}" in body:  # a missing value (generate_tables.fmt); the macro definitions use \missing alone
             BLOCK.append(f"missing values in `{p.relative_to(ROOT)}`")
     for p in sorted(GEN.rglob("*.tex")):
-        for pat, flags in FORBIDDEN:
-            if re.search(pat, p.read_text(), flags):
-                BLOCK.append(f"`{p.relative_to(ROOT)}` contains the string `{pat}`")
+        for i, (pat, flags) in enumerate(FORBIDDEN, 1):
+            for m in re.finditer(pat, p.read_text(), flags):  # the term itself is never written to the report
+                line = p.read_text().count("\n", 0, m.start()) + 1
+                BLOCK.append(f"`{p.relative_to(ROOT)}` line {line} contains local hygiene term #{i}")
     if MANIFEST.exists():
         m = pd.read_csv(MANIFEST)
         for _, r in m[m.status != "real"].iterrows():
@@ -162,6 +166,50 @@ def check_figures_used(t: str) -> None:
                 BLOCK.append(f"included figure `{g}` has no 'real' row in the figure manifest (status: {st})")
 
 
+def check_figure_numbering(t: str) -> None:
+    """The k-th figure float includes figures/Fig<k>.<ext>, because PLOS asks for figure files named after the
+    printed figure number (Fig1.tif, Fig2.tif, ...)."""
+    body = strip_comments(t.split(r"\begin{document}", 1)[-1])
+    floats = re.findall(r"\\begin\{figure\*?\}(.*?)\\end\{figure\*?\}", body, re.S)
+    bad = []
+    for k, f in enumerate(floats, 1):
+        g = re.search(r"\\includegraphics\s*(?:\[[^\]]*\])?\s*\{([^}]*)\}", f)
+        if g and Path(g.group(1)).stem != f"Fig{k}":
+            bad.append(f"Fig {k} includes `{g.group(1)}`")
+    (BLOCK if bad else OK).append(f"figure files not named after their printed number: {bad}" if bad
+                                  else f"figure files Fig1-Fig{len(floats)} match the printed figure numbers")
+
+
+def check_references(t: str) -> None:
+    """No unfinished wording ('to be added', TODO, ...) in the fields of refs.bib or in the compiled .bbl."""
+    bibname = re.search(r"\\bibliography\{([^}]*)\}", strip_comments(t))
+    bib = MANUSCRIPT / f"{bibname.group(1).split(',')[0].strip()}.bib" if bibname else BIB
+    if bib.exists():  # entry fields only: comment lines and the x-verified provenance notes are not printed
+        fields = [l for l in bib.read_text().splitlines()
+                  if not l.lstrip().startswith("%") and not re.match(r"\s*x-verified\s*=", l)]
+        hits = [l.strip() for l in fields if REF_PLACEHOLDER.search(l)]
+        (BLOCK if hits else OK).append(f"unfinished wording in {bib.name}: {hits[:5]}" if hits
+                                       else f"no unfinished wording in the fields of {bib.name}")
+    bbl = TEX.with_suffix(".bbl")
+    if bbl.exists():
+        hits = [l.strip() for l in bbl.read_text().splitlines() if REF_PLACEHOLDER.search(l)]
+        (BLOCK if hits else OK).append(f"unfinished wording in the compiled reference list: {hits[:5]}" if hits
+                                       else "no unfinished wording in the compiled reference list")
+
+
+def check_das() -> None:
+    """The Data Availability Statement (pasted into Editorial Manager) must be complete before submission."""
+    if not DAS.exists():
+        BLOCK.append(f"`{DAS.relative_to(ROOT)}` missing (Data Availability Statement for the submission form)")
+        return
+    statement = DAS.read_text().split("--- Statement", 1)[-1]  # the header explains the markers
+    items = re.findall(r"\[(?:TO BE ADDED|AUTHOR INPUT)[^\]]*\]", statement)
+    for a in items:
+        INPUT.append(f"Data Availability Statement: {a}")
+    (BLOCK if items else OK).append(f"{len(items)} open item(s) in the Data Availability Statement" if items
+                                    else "Data Availability Statement complete")
+
+
 def check_manuscript():
     if not TEX.exists():
         BLOCK.append(f"manuscript `{TEX.relative_to(ROOT)}` missing")
@@ -207,10 +255,14 @@ def check_manuscript():
                                     if n_ask else "no open \\authorinput items")
     # wording that does not belong in this manuscript: whole source incl. preamble and comments, without references
     src = re.sub(r"\\begin\{thebibliography\}.*?\\end\{thebibliography\}", "", t, flags=re.S)
-    for pat, flags in FORBIDDEN:
-        hits = [src[max(0, m.start() - 40):m.end() + 40].replace("\n", " ") for m in re.finditer(pat, src, flags)]
-        (BLOCK if hits else OK).append(f"manuscript source contains `{pat}` {len(hits)}x, e.g. '…{hits[0]}…'"
-                                       if hits else f"manuscript source free of `{pat}`")
+    # the report is shared with the code, so it names neither the terms nor their context, only the term number
+    # (line of .scripts/qc_forbidden_terms.txt among the non-comment lines) and the source line
+    hits = [(i, src.count("\n", 0, m.start()) + 1) for i, (pat, flags) in enumerate(FORBIDDEN, 1)
+            for m in re.finditer(pat, src, flags)]
+    for i, line in hits:
+        BLOCK.append(f"manuscript source line {line} contains local hygiene term #{i}")
+    if FORBIDDEN and not hits:
+        OK.append(f"manuscript source free of the {len(FORBIDDEN)} local hygiene terms")
     # line numbers (PLOS template: \linenumbers after the abstract)
     (OK if re.search(r"\\linenumbers\b", body_nocomment) else BLOCK).append(
         "line numbers enabled (\\linenumbers)" if re.search(r"\\linenumbers\b", body_nocomment)
@@ -242,6 +294,8 @@ def check_manuscript():
     else:
         WARN.append("title not found (expected {\\Large \\textbf{...}} as in the PLOS template)")
     check_figures_used(t)
+    check_figure_numbering(t)
+    check_references(t)
 
     cited = set(k.strip() for c in re.findall(r"\\cite[pt]?\*?\{([^}]*)\}", body_nocomment) for k in c.split(","))
     cited.discard("")
@@ -279,6 +333,7 @@ def main() -> None:
     check_runs(reg)
     check_generated()
     check_manuscript()
+    check_das()
     ready = not BLOCK
     lines = ["# QC report (generated by .scripts/final_qc.py)\n",
              f"**Submission-ready: {'YES' if ready else 'NO'}** — {len(BLOCK)} blocker(s), {len(INPUT)} author-input item(s), {len(WARN)} warning(s).\n"]

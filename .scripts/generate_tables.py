@@ -142,7 +142,20 @@ def wrapcol(width: str) -> str:
 
 TABLE_LABEL = {"stats_hgb_controlled": "Recording statistics", "stats_hgb_orig6s": "Recording statistics (orig. prep.)",
                "bscan_orig6s": "BSCAN (orig. prep.)", "dual_plain": "Dual, no SE, no attention",
-               "dual_no_tattn": "Dual, no attention"}
+               "dual_no_tattn": "Dual, no attention", "ssl_xlsr_probe": "XLS-R (frozen) + logistic regression"}
+# readable names of the robustness conditions in tab_robustness (the codes stay in the CSV twin)
+COND_LABEL = {"clean": "Clean", "noise_snr20": "White noise, 20 dB SNR", "noise_snr10": "White noise, 10 dB SNR",
+              "noise_snr5": "White noise, 5 dB SNR", "mp3_64k": "MP3, 64 kbit/s", "mp3_32k": "MP3, 32 kbit/s",
+              "aac_32k": "AAC, 32 kbit/s", "telephone": "Telephone band", "clip_+6dB": "Clipping (+6 dB gain)",
+              "speed_0.95": "Speed $\\times$0.95", "speed_1.05": "Speed $\\times$1.05", "pitch_+1st": "Pitch +1 semitone",
+              "pitch_-1st": "Pitch $-$1 semitone", "reverb_rt0.3": "Reverberation, RT60 0.3 s",
+              "reverb_rt0.6": "Reverberation, RT60 0.6 s"}
+# readable names and order of the splits in tab_splits (the codes stay in the CSV twin)
+SPLIT_ORDER = ["train", "validation", "internal_test", "external_BF-SUST", "external_BF-MOZ", "external_MEN",
+               "external_BF-NEWS"]
+SPLIT_TEXT = {"train": "Training", "validation": "Validation", "internal_test": "Internal test",
+              "external_BF-SUST": "External test (BF-SUST)", "external_BF-MOZ": "External test (BF-MOZ)",
+              "external_MEN": "External test (MEN)", "external_BF-NEWS": "External (BF-NEWS)"}
 PROBE_LABEL = {"append_silence_0.44": "append 0.44 s silence", "trim_trailing": "trim trailing silence",
                "add_dc_neg": "add DC offset", "remove_dc": "remove DC offset", "dither_-60dBFS": "add $-$60 dBFS noise"}
 
@@ -197,9 +210,9 @@ def t_corpora() -> pd.DataFrame:
     write_table("tab_corpora", "Corpora and subsets. BF-SUST, BF-MOZ and BF-NEWS are the SUST, Common Voice and news "
                 "subsets of BanglaFake; MEN is the Mendeley Bengali corpus (version 4). Counts, durations and sample "
                 "rates (SR) were measured from the original archives",
-                ["Subset", "Bona fide", "Spoof", "Hours", "SR (kHz)", "Mean duration (s)", "Speakers", "Generator", "Licence"],
+                ["Subset", "Bona fide", "Synthetic", "Hours", "SR (kHz)", "Mean duration (s)", "Speakers", "Generator", "Licence"],
                 rows, "tab:corpora", align="lrrrcccll", wide=True,
-                note="Pairs of values: bona fide / spoof. Speakers: bona fide speakers / synthetic voices. The number of "
+                note="Pairs of values: bona fide / synthetic. Speakers: bona fide speakers / synthetic voices. The number of "
                      "SUST bona fide speakers is not documented in the release (the BanglaFake paper lists seven bona fide "
                      "speakers in total, five of them from Common Voice). "
                      "MEN stores its synthetic recordings per speaker folder, but the number of distinct synthetic voices is not "
@@ -212,17 +225,22 @@ def t_splits() -> pd.DataFrame:
     for proto in ("P1", "P2"):
         s = pd.read_csv(ROOT / f"results/phase3/split_counts_{proto}.csv")
         col = f"split_{proto}"
-        for sp, g in s.groupby(col):
+        groups = dict(tuple(s.groupby(col)))
+        order = [sp for sp in SPLIT_ORDER if sp in groups] + sorted(sp for sp in groups if sp not in SPLIT_ORDER)
+        for i, sp in enumerate(order):
+            g = groups[sp]
             nb = int(g[g.label == 0].files.sum())
             ns = int(g[g.label == 1].files.sum())
             role = "training" if sp == "train" else "model/threshold selection" if sp == "validation" else "test"
-            rows.append([proto, sp.replace("_", r"\_"), ", ".join(sorted(g.dataset_id.unique())),
-                         fmt(nb, kind="int"), fmt(ns, kind="int"), role])
+            shown = "diagnostic only (not scored)" if sp == "external_BF-NEWS" else role
+            rows.append([proto if i == 0 else "", SPLIT_TEXT.get(sp, sp.replace("_", r"\_")),
+                         ", ".join(sorted(g.dataset_id.unique())), fmt(nb, kind="int"), fmt(ns, kind="int"), shown])
             recs.append({"protocol": proto, "split": sp, "corpora": ",".join(sorted(g.dataset_id.unique())),
                          "bonafide": nb, "spoof": ns, "role": role})
     write_table("tab_splits", "Evaluation protocols. P1 trains on BF-SUST with sentence-grouped 70/15/15 splits; P2 "
-                "trains on MEN with set-disjoint (hence speaker-disjoint) 9/3/3 sets. Counts are recordings",
-                ["Protocol", "Split", "Corpora", "Bona fide", "Spoof", "Role"], rows, "tab:splits", align="lllrrl",
+                "trains on MEN with set-disjoint (hence speaker-disjoint) 9/3/3 sets. Counts are recordings. BF-NEWS (labels "
+                "unverified) is scored only as a diagnostic and excluded from every metric",
+                ["Protocol", "Split", "Corpora", "Bona fide", "Synthetic", "Role"], rows, "tab:splits", align="lllrrl",
                 wide=True)
     return pd.DataFrame(recs)
 
@@ -243,8 +261,8 @@ def t_shortcuts() -> pd.DataFrame:
     hdr = (["Preprocessing"] + [split_label("P1", s) + ("$^{\\ast}$" if s == "internal_test" else "") for s in P1S]
            + [split_label("P2", s) + ("$^{\\ast}$" if s == "internal_test" else "") for s in P2S])
     write_table("tab_shortcuts", "Label information available from coarse window statistics. Recording-level AUC of a "
-                "gradient-boosting classifier trained on 11 content-agnostic window descriptors (padding, silence, level, "
-                "DC offset, clipping, spectral balance) of the protocol's training split",
+                "gradient-boosting classifier trained on 11 coarse window descriptors (mainly recording-chain properties: "
+                "padding, silence, level, DC offset, clipping, spectral balance) of the protocol's training split",
                 hdr, rows, "tab:shortcuts", align="lcccccc", wide=True,
                 groups=[("", 1), ("P1: trained on BF-SUST", 3), ("P2: trained on MEN", 3)],
                 note="$^{\\ast}$ held-out split of the training corpus. Recording score: mean window probability. The "
@@ -272,7 +290,7 @@ def model_row(summary: pd.DataFrame, model: str, proto: str, splits: list[str], 
 
 
 def t_models(summary: pd.DataFrame, reg: dict, name: str, models: list[str], caption: str, label: str,
-             proto: str = "P1", extra_note: str = "") -> pd.DataFrame:
+             proto: str = "P1", extra_note: str = "", first_col: str = "l") -> pd.DataFrame:
     splits = P1S if proto == "P1" else P2S
     rows, recs = [], []
     for m in models:
@@ -282,15 +300,15 @@ def t_models(summary: pd.DataFrame, reg: dict, name: str, models: list[str], cap
     hdr = ["Model"] + ["AUC", "EER (\\%)"] * len(splits)
     groups = [("", 1)] + [(split_label(proto, sp, short=False), 2) for sp in splits]
     write_table(name, caption, hdr, rows, label, has_placeholder=any_ph(rows), groups=groups, wide=True,
-                note="Mean $\\pm$ SD over seeds where more than one seed was run; otherwise seed 42." + extra_note)
+                align=first_col + "c" * (len(hdr) - 1), note="Mean $\\pm$ SD over seeds where more than one seed was run; otherwise seed 42." + extra_note)
     return pd.DataFrame(recs)
 
 
 def t_tiers(summary: pd.DataFrame, reg: dict) -> pd.DataFrame:
     """Multi-tier summary of BSCAN (internal test, independent and cross-dataset tiers) under protocol P1."""
     tiers = [("internal_test", "\\textbf{Tier 1:} Internal test (BF-SUST, held out)"),
-             ("external_BF-MOZ", "\\textbf{Tier 2:} Independent (Mozilla)"),
-             ("external_MEN", "\\textbf{Tier 3:} Cross-dataset (Mendeley)")]
+             ("external_BF-MOZ", "\\textbf{Tier 2:} Independent (BF-MOZ)"),
+             ("external_MEN", "\\textbf{Tier 3:} Cross-dataset (MEN)")]
     st42, m42 = metrics_of("bscan_controlled__P1__seed42")
     rows, recs = [], []
     for sp, name in tiers:
@@ -309,7 +327,7 @@ def t_tiers(summary: pd.DataFrame, reg: dict) -> pd.DataFrame:
         recs.append({"tier": name, "split": sp, "n": n, "status": s["status"]})
     write_table("tab_tiers", "Performance of BSCAN across the evaluation tiers (protocol P1). Recording-level "
                 "metrics; the decision threshold is the validation EER point and is never re-tuned on test data",
-                ["Evaluation tier", "Recordings", "AUC-ROC", "EER (\\%)", "Accuracy (\\%)", "Macro-F1", "Sensitivity (\\%)",
+                ["Evaluation tier", "Recordings", "AUC", "EER (\\%)", "Accuracy (\\%)", "Macro-F1", "Sensitivity (\\%)",
                  "Specificity (\\%)"], rows, "tab:tiers", align=wrapcol("1.15in") + "ccccccc", has_placeholder=any_ph(rows),
                 wide=True, colsep=4,
                 note="Mean $\\pm$ SD over three seeds (42, 123, 2026). Tier 1 is a held-out partition that played no part "
@@ -321,8 +339,8 @@ def t_bootstrap(reg: dict) -> pd.DataFrame:
     """Cluster-bootstrap confidence intervals of BSCAN (seed 42) per test set."""
     st, m = metrics_of("bscan_controlled__P1__seed42")
     rows, recs = [], []
-    for sp, name in (("internal_test", "Internal test (BF-SUST)"), ("external_BF-MOZ", "Independent (Mozilla)"),
-                     ("external_MEN", "Cross-dataset (Mendeley)")):
+    for sp, name in (("internal_test", "Internal test (BF-SUST)"), ("external_BF-MOZ", "Independent (BF-MOZ)"),
+                     ("external_MEN", "Cross-dataset (MEN)")):
         v = (m or {}).get("splits", {}).get(sp)
         if not v:
             rows.append([name] + [r"\missing{}"] * 5)
@@ -333,7 +351,7 @@ def t_bootstrap(reg: dict) -> pd.DataFrame:
                      fmt(v["eer"], st, "eer_pct"), f"[{fmt(ce[0], st, 'eer_pct')}, {fmt(ce[1], st, 'eer_pct')}]"])
         recs.append({"split": sp, "auc": v["auc"], "auc_ci": ca, "eer": v["eer"], "eer_ci": ce, "status": st})
     write_table("tab_bootstrap", "Cluster-bootstrap 95\\% confidence intervals of BSCAN. P1, seed 42; 2,000 resamples "
-                "of sentence groups for BanglaFake and of speakers for Mendeley",
+                "of sentence groups for BanglaFake and of speakers for MEN",
                 ["Test set", "Clusters", "AUC", "95\\% CI (AUC)", "EER (\\%)", "95\\% CI (EER)"], rows, "tab:bootstrap",
                 align="lccccc", has_placeholder=any_ph(rows), wide=True)
     return pd.DataFrame(recs)
@@ -355,23 +373,27 @@ def t_cross(reg: dict) -> pd.DataFrame:
     return pd.DataFrame(recs)
 
 
-def t_paired(reg: dict) -> pd.DataFrame:
+def t_paired(reg: dict) -> None:
+    """Paired comparisons, one table per protocol (tab_paired: P1, tab_paired_p2: P2); in one table the 57 rows
+    are taller than a page.  Each table writes its CSV twin."""
     p = pd.read_csv(ROOT / "results/stats/paired_comparisons.csv")
-    p = p[(p.protocol == "P1") & p["delta_auc"].notna()] if "delta_auc" in p else p.iloc[0:0]
-    rows = []
-    for _, r in p.iterrows():
-        b = r["run_b"].split("__")[0]
-        rows.append([tlabel(reg, b), split_label("P1", r["split"]),
-                     fmt(r["delta_auc"], r["status"]) + f" [{fmt(r['delta_auc_ci_low'], r['status'])}, {fmt(r['delta_auc_ci_high'], r['status'])}]",
-                     fmt(r["delong_p_holm"], r["status"], "p"), fmt(r["mcnemar_p"], r["status"], "p")])
-    write_table("tab_paired", "Paired comparisons of BSCAN with each comparator (P1, seed 42, same recordings). "
-                "$\\Delta$AUC = AUC(BSCAN) $-$ AUC(comparator) with 95\\% cluster-bootstrap CI; DeLong p-values "
-                "Holm-adjusted within each test set; exact McNemar test on decisions at each model's validation "
-                "threshold", ["Comparator", "Test set", "$\\Delta$AUC [95\\% CI]", "DeLong p (Holm)", "McNemar p"],
-                rows, "tab:paired", align="llccc", has_placeholder=any_ph(rows), wide=True,
-                note="DeLong and McNemar tests treat recordings as independent; a difference is called significant in the "
-                     "text only if the Holm-adjusted DeLong p-value is below 0.05 and the cluster-bootstrap CI excludes zero.")
-    return p
+    p = p[p.protocol.isin(["P1", "P2"]) & p["delta_auc"].notna()] if "delta_auc" in p else p.iloc[0:0]
+    legend = ("$\\Delta$AUC = AUC(BSCAN) $-$ AUC(comparator) with 95\\% cluster-bootstrap CI; DeLong $p$-values "
+              "Holm-adjusted within each test set; exact McNemar test on decisions at each model's validation threshold")
+    note = ("DeLong and McNemar tests treat recordings as independent; a difference is called significant in the "
+            "text only if the Holm-adjusted DeLong $p$-value is below 0.05 and the cluster-bootstrap CI excludes zero.")
+    for proto, name, label, training in (("P1", "tab_paired", "tab:paired", "training on BF-SUST"),
+                                         ("P2", "tab_paired_p2", "tab:paired_p2", "training on MEN")):
+        q = p[p.protocol == proto]  # registry order
+        rows = [[tlabel(reg, r["run_b"].split("__")[0]), split_label(proto, r["split"]),
+                 fmt(r["delta_auc"], r["status"]) + f" [{fmt(r['delta_auc_ci_low'], r['status'])}, {fmt(r['delta_auc_ci_high'], r['status'])}]",
+                 fmt(r["delong_p_holm"], r["status"], "p"), fmt(r["mcnemar_p"], r["status"], "p")]
+                for _, r in q.iterrows()]
+        write_table(name, f"Paired comparisons of BSCAN with each comparator under {proto} ({training}; seed 42, "
+                    "same recordings). " + legend,
+                    ["Comparator", "Test set", "$\\Delta$AUC [95\\% CI]", "DeLong $p$ (Holm)", "McNemar $p$"],
+                    rows, label, align="llccc", has_placeholder=any_ph(rows), wide=True, note=note)
+        q.to_csv(CSV / f"{name}.csv", index=False)
 
 
 def t_analysis(reg: dict, kind: str) -> pd.DataFrame:
@@ -396,22 +418,24 @@ def t_analysis(reg: dict, kind: str) -> pd.DataFrame:
         return fmt(float(v[col].iloc[0]), v.status.iloc[0], kind_)
 
     if kind == "robustness":
-        rows = []
+        rows, any_noop = [], False
         for (rn, cond), g in df.groupby(["run", "condition"], sort=False):
             noop = cond != "clean" and "share_input_changed" in g.columns and bool((g.share_input_changed == 0).all())
-            label = cond.replace("_", r"\_") + (r"$^{\ddagger}$" if noop else "")
+            any_noop |= noop
+            label = COND_LABEL.get(cond, cond.replace("_", r"\_")) + (r"$^{\ddagger}$" if noop else "")
             row = [tlabel(reg, rn.split("__")[0]) if cond == "clean" else "", label]
             for sp in a["splits"]:
                 row.append(cell(g[g.split == sp], "auc", "auc"))
             rows.append(row)
         write_table("tab_robustness", "Robustness to test-time perturbations (recording-level AUC; no retraining). "
-                    "Perturbations applied to the 16 kHz recording before the model's own preprocessing; up to 600 "
-                    "recordings per test set (stratified, fixed)", ["Model", "Condition"] +
+                    "Perturbations applied to the 16 kHz recording before the model's own preprocessing; 600 "
+                    "recordings per test set (stratified, fixed seed)", ["Model", "Condition"] +
                     [SPLIT_LABEL[s].split(" (")[0] for s in a["splits"]], rows, "tab:robustness", align="llccc",
                     has_placeholder=any_ph(rows),
-                    note="clip\\_+6dB: +6 dB gain with hard clipping at full scale; every model peak-normalises its "
-                         "input, so only the clipping changes the input. $^{\\ddagger}$ the model's preprocessing "
-                         "undoes this condition (the input is unchanged for every recording).")
+                    note="Clipping: +6 dB gain with hard clipping at full scale; every model peak-normalises its "
+                         "input, so only the clipping changes the input." + (
+                             " $^{\\ddagger}$ the model's preprocessing undoes this condition (the input is unchanged "
+                             "for every recording)." if any_noop else ""))
     else:
         rows, last = [], None
         for (rn, cond), g in df.groupby(["run", "condition"], sort=False):
@@ -427,11 +451,11 @@ def t_analysis(reg: dict, kind: str) -> pd.DataFrame:
         write_table("tab_probes", "Counterfactual shortcut probes. Mean change of the recording score (logit), share of "
                     "recordings whose model input changes, and share of those whose decision flips when a single cue "
                     "is added or removed at test time",
-                    ["Model", "Probe", "$\\Delta$ bona fide", "$\\Delta$ spoof", "Changed (\\%)",
+                    ["Model", "Probe", "$\\Delta$ bona fide", "$\\Delta$ synthetic", "Changed (\\%)",
                      "Flipped (\\%)", "Changed (\\%)", "Flipped (\\%)"], rows, "tab:probes",
                     align=wrapcol("0.8in") + "lcccccc", has_placeholder=any_ph(rows), wide=True,
                     groups=[("", 2), ("BF-SUST (internal test)", 4), ("MEN", 2)],
-                    note="$\\Delta$: mean change of the recording score (logit) of bona fide and spoof recordings "
+                    note="$\\Delta$: mean change of the recording score (logit) of bona fide and synthetic recordings "
                          "(BF-SUST internal test). Changed: the windows that reach the model differ from the clean ones; "
                          "a probe the preprocessing removes by construction changes no input. Flipped: among changed "
                          "recordings; -- when none changed.")
@@ -452,7 +476,7 @@ def t_efficiency() -> pd.DataFrame:
         d["platform"] = "CUDA GPU"
         frames.append(d)
     df = pd.concat(frames) if frames else pd.DataFrame()
-    names = {"bscan_controlled": "BSCAN", "mel_only": "Mel-only", "lfcc_only": "LFCC-only", "dual_plain": "Dual, plain",
+    names = {"bscan_controlled": "BSCAN", "mel_only": "Mel-only", "lfcc_only": "LFCC-only", "dual_plain": "Dual, no SE, no attention",
              "lcnn_lfcc": "LCNN-style"}
     rows = []
     for _, r in df[df.platform == "CPU (1 thread)"].iterrows():
@@ -462,13 +486,17 @@ def t_efficiency() -> pd.DataFrame:
                      fmt(r.b1_mean_ms, kind="ms", sd=r.b1_std_ms), f"{r.b1_p95_ms:.2f}", fmt(r.e2e_rtf, kind="rtf"),
                      fmt(float(mps.b1_mean_ms.iloc[0]), kind="ms") if len(mps) else r"\missing{}",
                      fmt(float(cu.b1_mean_ms.iloc[0]), kind="ms") if len(cu) else r"\missing{}"])
-    write_table("tab_efficiency", "Computational cost. Parameters, multiply-accumulates per 6 s window, batch-1 latency "
-                "(mean $\\pm$ SD and p95) and end-to-end real-time factor on one CPU thread of an Apple M5 laptop "
-                "(load, resample, segment, features, model; 100 recordings), and batch-1 latency on GPUs",
-                ["Model", "Params", "MACs (M)", "Mean (ms)", "p95 (ms)", "RTF", "MPS (ms)", "CUDA (ms)"], rows,
+    write_table("tab_efficiency", "Computational cost. Parameters, multiply-accumulate operations per 6 s window, "
+                "batch-1 latency (mean $\\pm$ SD and p95) and end-to-end real-time factor on one CPU thread of an "
+                "Apple-silicon laptop (arm64, 10 cores, 24 GB; load, resample, segment, features, model; 100 recordings), "
+                "and batch-1 latency on GPUs",
+                ["Model", "Parameters", "MACs (M)", "Mean (ms)", "p95 (ms)", "RTF", "MPS (ms)", "CUDA (ms)"], rows,
                 "tab:efficiency", align="lrrccccc", has_placeholder=any_ph(rows), wide=True,
                 groups=[("", 3), ("CPU, 1 thread", 3), ("GPU, batch 1", 2)],
-                note="\\missing{} = not yet measured (CUDA latency is measured in the Colab analysis notebook).")
+                note="CUDA, NVIDIA GPU (CUDA backend); MACs, multiply-accumulate operations (millions); MPS, Apple GPU "
+                     "(Metal Performance Shaders backend); p95, 95th percentile; RTF, real-time factor; SD, standard "
+                     "deviation." + (" \\missing{} = not yet measured." if any(r"\missing" in c for r in rows for c in r)
+                                     else ""))
     return df
 
 
@@ -496,7 +524,8 @@ def macros(summary: pd.DataFrame, paired: pd.DataFrame, extra: dict) -> None:
              r"% information only the authors can give; .scripts/final_qc.py blocks submission while any is left",
              r"\providecommand{\authorinput}[1]{\textcolor{red}{[AUTHOR INPUT: #1]}}",
              r"% table layout hooks (PLOS template v3.8); a manuscript may define its own before this file",
-             r"\providecommand{\tablesetup}{\small}",
+             # single-spaced tables: with the manuscript's \doublespacing the paired-comparison table is taller than a page
+             r"\providecommand{\tablesetup}{\small\ifdefined\setstretch\setstretch{1}\fi}",
              r"\providecommand{\tablefloat}{table}",
              r"\providecommand{\tabletop}{\hline}", r"\providecommand{\tablemid}{\hline}",
              r"\providecommand{\tablebottom}{\hline}",
@@ -654,7 +683,7 @@ def shortcut_macros() -> dict:
     """Macros for the dataset-shortcut findings (Phases 1 and 3; deterministic, always real).
 
     sc/<corpus>/<cue>                      single-descriptor separability max(AUC, 1-AUC) per corpus
-    sc/<protocol>/<scheme>/<features>/<split>   recording-level AUC of the content-agnostic
+    sc/<protocol>/<scheme>/<features>/<split>   recording-level AUC of the coarse-statistics
                                                 gradient-boosting diagnostic (model-visible windows)
     """
     out = {}
@@ -679,6 +708,23 @@ def shortcut_macros() -> dict:
     return out
 
 
+def ci_macros() -> dict:
+    """95% cluster-bootstrap CI of the AUC of the seed-42 recording-statistics baseline per protocol and test set.
+
+    <model>/<protocol>/<split>/auc-ci     'low--high' (e.g. stats-hgb-controlled/P1/external-MEN/auc-ci)
+    """
+    out = {}
+    for model in ("stats_hgb_controlled", "stats_hgb_orig6s"):
+        for proto in ("P1", "P2"):
+            st, m = metrics_of(f"{model}__{proto}__seed42")
+            for sp, v in ((m or {}).get("splits") or {}).items():
+                ci = v.get("auc_ci95")
+                if ci and all(c == c for c in ci):
+                    lo, hi = (re.sub(r"(?<![\w$])-(?=\d)", "$-$", f"{c:.3f}") for c in ci)
+                    out["/".join(x.replace("_", "-") for x in (model, proto, sp)) + "/auc-ci"] = (f"{lo}--{hi}", st, "text")
+    return out
+
+
 def main() -> None:
     reg = load_registry()
     CSV.mkdir(parents=True, exist_ok=True)
@@ -694,11 +740,11 @@ def main() -> None:
                                         "ssl_xlsr_probe"],
              "Representation study under P1. Identical branch architecture, optimiser, budget and preprocessing; "
              "only the input representation differs. Last row: a learned-representation reference",
-             "tab:repr", extra_note=" XLS-R: frozen XLS-R 300M encoder (layer 12 of 24, mean-pooled per window) with a "
+             "tab:repr", first_col=wrapcol("1.45in"), extra_note=" XLS-R: frozen XLS-R 300M encoder (layer 12 of 24, mean-pooled per window) with a "
              "logistic-regression back end instead of the branch architecture, same windows and threshold rule; one seed."
              ).to_csv(CSV / "tab_repr.csv", index=False)
     t_models(summary, reg, "tab_ablation", ["bscan_controlled", "dual_no_se", "dual_no_tattn", "dual_plain"],
-             "Trained ablation under P1. Every variant is trained from scratch with the same budget",
+             "Ablation under P1 (each variant trained from scratch). Same data, preprocessing, optimiser and budget as BSCAN",
              "tab:ablation").to_csv(CSV / "tab_ablation.csv", index=False)
     t_models(summary, reg, "tab_preproc", ["bscan_orig6s", "bscan_controlled", "stats_hgb_orig6s", "stats_hgb_controlled"],
              "Effect of shortcut-controlled preprocessing (P1). Original preprocessing (orig. prep.): 6 s windows with "
@@ -711,7 +757,7 @@ def main() -> None:
     t_cross(reg).to_csv(CSV / "tab_cross.csv", index=False)
     t_tiers(summary, reg).to_csv(CSV / "tab_tiers.csv", index=False)
     t_bootstrap(reg).to_csv(CSV / "tab_bootstrap.csv", index=False)
-    t_paired(reg).to_csv(CSV / "tab_paired.csv", index=False)
+    t_paired(reg)  # writes tab_paired.csv and tab_paired_p2.csv itself
     t_analysis(reg, "robustness").to_csv(CSV / "tab_robustness.csv", index=False)
     t_analysis(reg, "probes").to_csv(CSV / "tab_probes.csv", index=False)
     eff = t_efficiency()
@@ -727,6 +773,7 @@ def main() -> None:
                       "eff/bscan/cpu-p95": (float(b.b1_p95_ms.iloc[0]), "real", "ms"),
                       "eff/bscan/rtf": (float(b.e2e_rtf.iloc[0]), "real", "rtf")})
     extra.update(shortcut_macros())
+    extra.update(ci_macros())
     extra.update(analysis_macros(reg))
     extra.update(compute_macros(reg))
     macros(summary, paired, extra)
