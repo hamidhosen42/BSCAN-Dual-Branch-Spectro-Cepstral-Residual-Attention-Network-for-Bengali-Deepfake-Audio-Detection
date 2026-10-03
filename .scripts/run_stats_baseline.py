@@ -1,6 +1,6 @@
-"""Recording-statistics baseline (content-agnostic), evaluated exactly like the neural models.
+"""Recording-statistics baseline (coarse recording statistics), evaluated exactly like the neural models.
 
-A histogram gradient-boosting classifier is trained on the 11 content-agnostic window descriptors
+A histogram gradient-boosting classifier is trained on the 11 coarse window descriptors
 of `.scripts/model_visible_shortcuts.py` (padding, silence/level, spectral balance; no speech
 content) from the protocol's TRAIN split.  Window scores (log-odds) are mean-pooled per recording;
 the threshold is the validation EER point; metrics and cluster-bootstrap CIs come from

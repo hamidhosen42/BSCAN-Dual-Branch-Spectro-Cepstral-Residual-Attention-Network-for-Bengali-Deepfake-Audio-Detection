@@ -34,6 +34,10 @@ results/cache/
 results/**/predictions_raw/
 .ipynb_checkpoints/
 
+# Returned Colab bundles (imported into results/ by .scripts/build_all.py --import)
+BSCAN_results_*/
+BSCAN_results_*.zip
+
 # Release build (metadata only; published on Kaggle, not in git)
 release/
 

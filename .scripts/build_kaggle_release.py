@@ -297,7 +297,9 @@ def main() -> None:
             f.drop(columns="audio_path").to_csv(dst / p.name, index=False)
             a, ref = auc(f.label.to_numpy(), f.score.to_numpy()), m["splits"].get(sp, {}).get("auc", float("nan"))
             assert np.isnan(a) == np.isnan(ref) and (np.isnan(a) or abs(a - ref) < 1e-6), f"{p}: AUC {a} vs metrics {ref}"
-            score_rows.append({"run": run.name, "protocol": m["protocol"], "model": m["model"], "split": sp, "n": len(f), "auc": a})
+            model, protocol, _ = run.name.split("__")  # neural runs' metrics.json has no model/protocol fields
+            score_rows.append({"run": run.name, "protocol": m.get("protocol", protocol), "model": m.get("model", model),
+                               "split": sp, "n": len(f), "auc": a})
         for fn in ("metrics.json", "environment.json"):
             if (run / fn).exists():
                 shutil.copyfile(run / fn, dst / fn)
@@ -341,12 +343,15 @@ def main() -> None:
     cue_rows = [[d, lab, f3(sep.get((d, c), float("nan")))] for d, c, lab in cues if (d, c) in sep.index]
     if len(scores):
         piv = scores.pivot(index="run", columns="split", values="auc")
-        model = scores.groupby("run").model.first()
+        model = scores.groupby("run").model.first().str.replace("content-agnostic", "coarse")
         cols = [c for c in ["validation", "internal_test", "external_BF-SUST", "external_BF-MOZ", "external_MEN"] if c in piv.columns]
         score_tab = table(["run", "model"] + cols, [[r, model[r]] + [f3(piv.loc[r, c]) for c in cols] for r in piv.index],
                           "ll" + "r" * len(cols))
     else:
         score_tab = "_No real run is available yet._\n"
+    n_runs = scores.run.nunique() if len(scores) else 0
+    scores_note = (f"Scores of all {n_runs} runs of the article are included: the neural models (trained on Google Colab), "
+                   "the XLS-R reference and the non-neural baselines." if n_runs else "")
     zero_note = ("" if has_zero else "\nThe per-recording `exact_zero_ratio` descriptor (fraction of exactly-zero samples) is added in a "
                  "later version; its single-descriptor separability is already in `audits/univariate_separability.csv`.\n")
     today = datetime.date.today().isoformat()
@@ -433,7 +438,7 @@ A detector that never hears speech content can therefore score highly in-corpus;
 AUC recomputed from the released score files (bona fide vs spoof):
 
 {score_tab}
-Scores of BSCAN, LCNN and the ablation variants are added in a later version once their GPU runs are complete.
+{scores_note}
 The statistics baseline here is evaluated per recording; the article's shortcut table reports window-descriptor
 diagnostics (`audits/model_visible_shortcut_diagnostics.csv`), so its AUCs can differ in the third decimal.
 

@@ -75,6 +75,7 @@ def fmt(v, status: str = "real", kind: str = "auc", sd=None) -> str:
     else:
         s = f"{v:.3f}" + (f" $\\pm$ {sd:.3f}" if sd is not None and sd == sd else "")
     if kind != "text":
+        s = re.sub(r"(?<![\w$])-(?=0(?:\.0+)?(?![\d.]))", "", s)  # a value that rounds to zero has no sign (no "-0.000")
         s = re.sub(r"(?<![\w$])-(?=\d)", "$-$", s)  # typographic minus
     if status == "placeholder":
         PLACEHOLDER_USED.add(kind)
@@ -647,8 +648,9 @@ def analysis_macros(reg: dict) -> dict:
                         out[k("probe", model, c, sp, "shift-spoof")] = (float(g.loc[c, "mean_score_shift_spoof"]), st, "auc")
                         if "share_input_changed" in g.columns:
                             out[k("probe", model, c, sp, "changed")] = (float(g.loc[c, "share_input_changed"]), st, "pct")
-                            out[k("probe", model, c, sp, "flip-changed")] = (
-                                float(g.loc[c, "decision_flip_rate_changed"]), st, "pct")
+                            if float(g.loc[c, "share_input_changed"]) > 0:  # undefined when the probe changed no input
+                                out[k("probe", model, c, sp, "flip-changed")] = (
+                                    float(g.loc[c, "decision_flip_rate_changed"]), st, "pct")
     return out
 
 
