@@ -37,8 +37,9 @@ SUBTITLE = "Bengali deepfake audio: leakage-aware splits, checksums, descriptors
 KAGGLE_ID = "hosen42/bengali-deepfake-forensics-dataset"
 KAGGLE_URL = f"https://www.kaggle.com/datasets/{KAGGLE_ID}"
 # Kaggle DOIs are per dataset version: after an upload, generate a DOI for that version on Kaggle and set it here
-# (None leaves the DOI out of README.md and CITATION.cff)
-DOI = None
+# (None leaves the DOI out of README.md and CITATION.cff). 10.34740/KAGGLE/DSV/20278870 = version 7 (2026-10-03), the
+# version with the scores of all runs that the article cites
+DOI = "10.34740/KAGGLE/DSV/20278870"
 CODE_URL = "https://github.com/hamidhosen42/bscan-bengali-deepfake-forensics"
 ARTICLE = "BSCAN: Dual-Branch Spectro-Cepstral Residual Attention Network for Bengali Deepfake Audio Detection"
 AUTHORS = ["Kahakashan Ashraf", "Md. Hamid Hosen", "Mahfuzulhoq Chowdhury"]

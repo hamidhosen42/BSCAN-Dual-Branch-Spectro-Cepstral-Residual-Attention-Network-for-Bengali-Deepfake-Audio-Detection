@@ -67,4 +67,4 @@ The data-audit steps that come before the GPU runs need the corpora in `data/`. 
 - **Mendeley Bangla Audio Dataset, version 4** (Dipto, Ayan & Faria, DOI 10.17632/4ftmwt86vr.4; its audio is byte-identical to version 1) is listed under CC BY 4.0. Versions 3 and 4 add a dataset usage agreement that, among other terms, allows academic and research use only, forbids redistribution without the provider's written consent, and forbids any re-identification of speakers. Its audio is not redistributed; fetch it from Mendeley Data and follow those terms.
 - Data files produced by this project (metadata, splits, descriptors, audits and scores) are released under CC BY 4.0. The code is released under the MIT licence (`LICENSE`).
 
-Please cite the article and both source datasets.
+Please cite the article and both source datasets. The companion dataset of this repository is: Ashraf K, Hosen MH, Chowdhury M. Bengali Deepfake Forensics Dataset (BSCAN), version 7. Kaggle; 2026. doi:[10.34740/KAGGLE/DSV/20278870](https://doi.org/10.34740/KAGGLE/DSV/20278870).
