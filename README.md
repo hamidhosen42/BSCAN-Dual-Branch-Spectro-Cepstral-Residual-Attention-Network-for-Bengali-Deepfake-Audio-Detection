@@ -20,7 +20,7 @@ Until the neural runs from the Colab notebook are imported, the pipeline fills e
 ## Repository map
 
 ```
-code/               BSCAN_full_pipeline.ipynb: self-contained Colab notebook for all GPU runs and analyses
+code/               BSCAN_full_pipeline.ipynb: Colab notebook for all GPU runs and analyses
                     banglafkpart.ipynb: exploratory notebook of an earlier, unpublished analysis with a
                     superseded pipeline (no reported result depends on it)
 src/bscan/          package: audio, features, data, models, train, evaluate, metrics, statistics,
@@ -45,12 +45,12 @@ The following are generated and not tracked in git: `results/runs_PLACEHOLDER/`,
 
 ## How to reproduce
 
-1. **GPU runs (Colab).** Open `code/BSCAN_full_pipeline.ipynb` in Google Colab ([open in Colab](https://colab.research.google.com/github/hamidhosen42/BSCAN-Dual-Branch-Spectro-Cepstral-Residual-Attention-Network-for-Bengali-Deepfake-Audio-Detection/blob/main/code/BSCAN_full_pipeline.ipynb)), select a GPU runtime and choose **Run all**. The notebook then:
+1. **GPU runs (Colab).** Open `code/BSCAN_full_pipeline.ipynb` in Google Colab ([open in Colab](https://colab.research.google.com/github/hamidhosen42/bscan-bengali-deepfake-forensics/blob/main/code/BSCAN_full_pipeline.ipynb)), select a GPU runtime and choose **Run all**. The notebook then:
    - downloads both corpora from their original hosts and verifies every file against its SHA-256;
    - runs the CUDA smoke test;
    - trains and evaluates every registered run (`configs/experiments.yaml`), then runs the robustness, probe and latency analyses.
 
-   It embeds the exact source files and a code version (a hash of `src/bscan`, `configs` and `tests`). Results go to Google Drive after every run, so a disconnected session resumes where it stopped. At the end the notebook downloads `BSCAN_results_<version>.zip`. To rebuild the notebook after a code change, run `python .scripts/build_colab_notebook.py`.
+   The notebook takes the code from this repository at a fixed commit and stops unless it matches the notebook's code version (a SHA-256 hash of `src/bscan`, `configs` and `tests`). Results go to Google Drive after every run, so a disconnected session resumes where it stopped. At the end the notebook downloads `BSCAN_results_<version>.zip`. After a code change, publish the code, set `PUBLIC_COMMIT` in `.scripts/build_colab_notebook.py` and rebuild the notebook with `python .scripts/build_colab_notebook.py`; `--embedded` instead writes a notebook that carries the source files itself (for unpublished code).
 2. **Tables, figures and checks (local).**
    ```bash
    .venv/bin/python .scripts/build_all.py --import BSCAN_results_<version>.zip

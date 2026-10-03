@@ -40,7 +40,7 @@ def sh(*args, check=True):
 
 
 def current_code_version() -> str:
-    """The code version the Colab notebook embeds: hash of src/bscan, configs and tests (build_colab_notebook.payload)."""
+    """The code version of the Colab notebook: hash of src/bscan, configs and tests (build_colab_notebook.payload)."""
     import importlib.util
 
     spec = importlib.util.spec_from_file_location("build_colab_notebook", ROOT / ".scripts" / "build_colab_notebook.py")
