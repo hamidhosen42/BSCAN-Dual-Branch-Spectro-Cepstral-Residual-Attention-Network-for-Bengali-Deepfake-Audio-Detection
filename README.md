@@ -12,10 +12,10 @@ This repository holds the code, configurations, split definitions and result fil
 
 - **Data audit.** It builds a per-file inventory of the two public Bengali corpora (BanglaFake and the Mendeley Bangla audio dataset), checks for exact and near-duplicate recordings, and measures recording-level cues (duration, silence, DC offset, level, sample rate) that separate the classes without any speech content.
 - **Leakage-aware protocols.** P1 trains on the SUST subset of BanglaFake with sentence-grouped 70/15/15 splits and tests on BanglaFake (Common Voice) and on the Mendeley corpus. P2 trains on the Mendeley corpus with set-disjoint (hence speaker-disjoint) splits and tests on BanglaFake. Splits are defined by metadata only (`splits/`, `metadata/`).
-- **Shortcut diagnostics.** A content-agnostic classifier trained on 11 window descriptors measures how much label information survives each preprocessing scheme. The controlled preprocessing (silence trimming, repeat-padding, DC removal, dither) is the default for every model.
+- **Shortcut diagnostics.** A classifier trained on 11 coarse window statistics (mainly recording-chain properties) measures how much label information survives each preprocessing scheme. The controlled preprocessing (silence trimming, repeat-padding, DC removal, dither) is the default for every model.
 - **Models.** BSCAN has two parallel residual branches (Mel spectrogram and LFCC) with squeeze-and-excitation and temporal attention pooling, fused by concatenation. The comparators are single-representation and Mel+MFCC variants, a trained ablation (no SE, no attention, neither), an LCNN-style LFCC model, an LFCC-GMM, the recording-statistics baseline, and a frozen XLS-R probe.
 - **Evaluation.** Thresholds come from the validation split only. The code reports recording-level AUC and EER, means and SDs over seeds, cluster-bootstrap confidence intervals, DeLong tests with Holm correction, McNemar tests, calibration and error analyses. It also runs test-time robustness perturbations, counterfactual shortcut probes, and CPU/GPU cost measurements.
-- **Outputs.** Every table, figure and number of the article is generated from the result files (`.scripts/generate_tables.py`, `.scripts/generate_figures.py`). Nothing is typed by hand.
+- **Outputs.** Every result table and figure of the article, and the model results quoted in its text, are generated from the result files (`.scripts/generate_tables.py`, `.scripts/generate_figures.py`).
 
 Until the neural runs from the Colab notebook are imported, the pipeline fills each missing run with a clearly marked **synthetic placeholder**: these sit in `results/runs_PLACEHOLDER/`, the values are printed in red with †, and the figures carry a watermark. The final QC (`.scripts/final_qc.py`) exits non-zero while any placeholder is left.
 
@@ -24,7 +24,8 @@ Until the neural runs from the Colab notebook are imported, the pipeline fills e
 ```
 code/               BSCAN_full_pipeline.ipynb: Colab notebook for all GPU runs and analyses
                     banglafkpart.ipynb: exploratory notebook of an earlier, unpublished analysis with a
-                    superseded pipeline (no reported result depends on it)
+                    superseded pipeline (no reported number is computed with it; the training hyperparameters were
+                    carried over from it)
 src/bscan/          package: audio, features, data, models, train, evaluate, metrics, statistics,
                     analysis, robustness, efficiency, ssl_probe, registry
 configs/            model configs; experiments.yaml is the registry of every reported run

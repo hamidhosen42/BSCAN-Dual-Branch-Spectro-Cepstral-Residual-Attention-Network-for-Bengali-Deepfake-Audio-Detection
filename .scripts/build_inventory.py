@@ -68,7 +68,7 @@ def classify(path: Path, root: Path) -> dict | None:
             speaker = "BF-VITS-voice"  # single male VITS voice (BanglaFake paper)
             generator = "VITS TTS (BanglaFake; trained on SUST TTS corpus)"
         elif subset == "BF-SUST":
-            speaker = "BF-SUST-speaker"  # SUST TTS corpus speaker (per BanglaFake paper; REQUIRES VERIFICATION)
+            speaker = "BF-SUST-speaker"  # the one SUST TTS voice talent (Ahmad et al. 2021, Sec. 3.3)
             generator = "none (bona fide)"
         elif subset == "BF-MOZ" and moz:
             speaker = f"BF-MOZ-{moz.group(1)}"  # Common Voice speaker tag embedded in the file name

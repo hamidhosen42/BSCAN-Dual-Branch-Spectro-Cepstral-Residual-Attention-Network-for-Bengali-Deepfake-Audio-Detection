@@ -318,6 +318,9 @@ def main() -> None:
     used = meta[~meta.exclude_from_metrics]
     spk = {d: meta[(meta.dataset_id == d) & (meta.label == 0) & (meta.speaker_id != "unknown")].speaker_id.nunique()
            for d in counts.index}
+    # every BF-SUST bona fide file carries the same placeholder speaker ID; the SUST TTS corpus was recorded by
+    # one male voice talent (Ahmad et al. 2021, Acoust Sci Technol 42:326-332, Sec. 3.3)
+    spk["BF-SUST"] = 1
     sr = {(d, l): "/".join(f"{int(v) / 1000:g}" for v in sorted(g.sample_rate.unique()))
           for (d, l), g in meta.groupby(["dataset_id", "label"])}
     corpora = [("BF-SUST", "BanglaFake, SUST TTS subset", "none named"),
@@ -416,7 +419,7 @@ sentence-disjoint; BanglaFake is the external test.
 
 Class labels are confounded with recording properties in every corpus. Median trailing silence in BF-SUST is
 {ts.get(0, float('nan')):.2f} s for bona fide and {ts.get(1, float('nan')):.2f} s for spoof recordings. Single-descriptor separability
-(|2·AUC − 1|, `audits/univariate_separability.csv`):
+(max(AUC, 1 − AUC); 0.5 = uninformative, `audits/univariate_separability.csv`):
 
 {table(["corpus", "descriptor", "separability"], cue_rows, "llr")}
 A detector that never hears speech content can therefore score highly in-corpus; see `scores/stats_hgb_*`
