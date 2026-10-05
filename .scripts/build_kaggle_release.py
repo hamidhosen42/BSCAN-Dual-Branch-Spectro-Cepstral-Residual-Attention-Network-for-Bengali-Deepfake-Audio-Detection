@@ -40,7 +40,7 @@ KAGGLE_URL = f"https://www.kaggle.com/datasets/{KAGGLE_ID}"
 # (None leaves the DOI out of README.md and CITATION.cff). 10.34740/KAGGLE/DSV/20278870 = version 7 (2026-10-03), the
 # version with the scores of all runs that the article cites
 DOI = "10.34740/KAGGLE/DSV/20278870"
-CODE_URL = "https://github.com/hamidhosen42/bscan-bengali-deepfake-forensics"
+CODE_URL = "https://github.com/hamidhosen42/BSCAN--Dual-Branch-Spectro-Cepstral-Residual-Attention-Network-for-Bengali-Deepfake-Audio-Detection"
 ARTICLE = "BSCAN: Dual-Branch Spectro-Cepstral Residual Attention Network for Bengali Deepfake Audio Detection"
 AUTHORS = ["Kahakashan Ashraf", "Md. Hamid Hosen", "Mahfuzulhoq Chowdhury"]
 BF_URL = "https://huggingface.co/datasets/sifat1221/banglaFake/resolve/main/final_data.zip"

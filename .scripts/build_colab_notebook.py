@@ -31,7 +31,7 @@ EMBED = sorted([p for p in (ROOT / "src" / "bscan").rglob("*.py")] + [p for p in
 # public repository and the commit the notebook checks out: its src/bscan, configs, tests and metadata table must give
 # the current code version (the notebook checks it).  Update after publishing a new code version; never rewrite the
 # public history, or this commit disappears.
-PUBLIC_REPO = "https://github.com/hamidhosen42/bscan-bengali-deepfake-forensics"
+PUBLIC_REPO = "https://github.com/hamidhosen42/BSCAN--Dual-Branch-Spectro-Cepstral-Residual-Attention-Network-for-Bengali-Deepfake-Audio-Detection"
 PUBLIC_COMMIT = "899d71d49a20ebf5e2129e78e8c3b12e995def4c"
 ARCHIVES = {
     "banglafake": {"url": "https://huggingface.co/datasets/sifat1221/banglaFake/resolve/main/final_data.zip",
