@@ -48,7 +48,7 @@ The following are generated and not tracked in git: `results/runs_PLACEHOLDER/`,
 
 ## How to reproduce
 
-1. **GPU runs (Colab).** Open `code/BSCAN_full_pipeline.ipynb` in Google Colab ([open in Colab](https://colab.research.google.com/github/hamidhosen42/BSCAN--Dual-Branch-Spectro-Cepstral-Residual-Attention-Network-for-Bengali-Deepfake-Audio-Detection/blob/main/code/BSCAN_full_pipeline.ipynb)), select a GPU runtime and choose **Run all**. The notebook then:
+1. **GPU runs (Colab).** Open `code/BSCAN_full_pipeline.ipynb` in Google Colab ([open in Colab](https://colab.research.google.com/github/hamidhosen42/BSCAN-Dual-Branch-Spectro-Cepstral-Residual-Attention-Network-for-Bengali-Deepfake-Audio-Detection/blob/main/code/BSCAN_full_pipeline.ipynb)), select a GPU runtime and choose **Run all**. The notebook then:
    - downloads both corpora from their original hosts and verifies every file against its SHA-256;
    - runs the CUDA smoke test;
    - trains and evaluates every registered run (`configs/experiments.yaml`), then runs the robustness, probe and latency analyses.
